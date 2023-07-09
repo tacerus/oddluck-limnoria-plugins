@@ -825,6 +825,7 @@ class Jeopardy(callbacks.Plugin):
                 results = "random"
         elif categories:
             results = []
+            down = False
             categories = categories.strip().split(",")
             for category in categories:
                 category = category.strip()
@@ -833,27 +834,45 @@ class Jeopardy(callbacks.Plugin):
                 else:
                     url = "{0}/search?query={1}".format(self.jserviceUrl, category)
                     data = requests.get(url, timeout=5)
-                    soup = BeautifulSoup(data.content)
-                    searches = soup.find_all("a")
-                    for i in range(len(searches)):
-                        search = searches[i].get("href").split("/")[-1]
-                        if search.isdigit():
-                            results.append(search)
+                    if data.status_code == requests.codes.ok:
+                        soup = BeautifulSoup(data.content)
+                        searches = soup.find_all("a")
+                        for i in range(len(searches)):
+                            search = searches[i].get("href").split("/")[-1]
+                            if search.isdigit():
+                                results.append(search)
+                    elif not down:
+                        down = True
+                        break
             if not results:
-                if self.registryValue("useBold", channel):
-                    irc.reply(
-                        ircutils.bold(
-                            "Error. Could not find any results for {0}".format(
-                                categories
-                            )
-                        ),
-                        prefixNick=False,
-                    )
+                if down:
+                    if self.registryValue("useBold", channel):
+                        irc.reply(
+                            ircutils.bold(
+                                "Error, API call failed."
+                            ),
+                            prefixNick=False,
+                        )
+                    else:
+                        irc.reply(
+                            "Error, API call failed.",
+                            prefixNick=False,
+                        )
                 else:
-                    irc.reply(
-                        "Error. Could not find any results for {0}".format(categories),
-                        prefixNick=False,
-                    )
+                    if self.registryValue("useBold", channel):
+                        irc.reply(
+                            ircutils.bold(
+                                "Error. Could not find any results for {0}".format(
+                                    categories
+                                )
+                            ),
+                            prefixNick=False,
+                        )
+                    else:
+                        irc.reply(
+                            "Error. Could not find any results for {0}".format(categories),
+                            prefixNick=False,
+                        )
                 return
             elif results and "shuffle" in optlist:
                 random.shuffle(results)
